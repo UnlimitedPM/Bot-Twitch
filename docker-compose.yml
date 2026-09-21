@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
-  twitch-afk-farmer:
+  bot:
     build: .
-    container_name: mon_afk_bot
+    container_name: bot-twitch
     restart: unless-stopped
-    environment:
-      - STREAMER_URL=https://www.twitch.tv/NomDuStreamer
-      # Colle ton token ci-dessous (sans les guillemets)
-      - TWITCH_TOKEN=TonTokenIci
-      - DISCORD_WEBHOOK=URL
+    env_file:
+      - .env
+    volumes:
+      # Le token OAuth est persiste ici pour survivre aux redemarrages.
+      - ./data:/app/data

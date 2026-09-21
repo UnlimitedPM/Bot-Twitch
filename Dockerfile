@@ -1,14 +1,16 @@
 FROM python:3.11-slim
 
-# On ajoute curl explicitement ici
-RUN apt-get update && \
-    apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir streamlink
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-COPY watch.sh /app/watch.sh
-RUN chmod +x /app/watch.sh
 
-CMD ["/app/watch.sh"]
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY bot ./bot
+COPY get_token.py ./
+
+RUN mkdir -p /app/data
+
+CMD ["python", "-m", "bot"]
