@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Fuseau des horodatages de logs : sans ca le conteneur log en UTC.
+      TZ: ${TZ:-Europe/Paris}
     volumes:
       # Le token OAuth est persiste ici pour survivre aux redemarrages.
       - ./data:/app/data

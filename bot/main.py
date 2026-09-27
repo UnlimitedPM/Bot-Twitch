@@ -288,7 +288,7 @@ class Bot:
 
 async def main() -> int:
     cfg = Config.load()
-    setup_log(cfg.log_level)
+    setup_log(cfg.log_level, cfg.timezone)
 
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()

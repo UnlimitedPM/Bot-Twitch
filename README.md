@@ -112,6 +112,7 @@ en route apres un crash ou un reboot.
 | `WATCH_QUALITY` | `audio_only` | Qualite regardee par `streamlink` (le plus leger). |
 | `POLL_INTERVAL` | `20` | Secondes entre deux verifications de secours (minimum 15). La detection normale passe par EventSub, pas par ce sondage. |
 | `LOG_LEVEL` | `INFO` | `DEBUG` pour tout voir. |
+| `TZ` | `Europe/Paris` | Fuseau des horodatages de logs (`Europe/Paris`, `America/New_York`...). Un conteneur Docker est en UTC par defaut, d'ou le decalage dans les logs. |
 | `DISCORD_WEBHOOK` | vide | Webhook optionnel pour les alertes (token mort, streamlink KO...). |
 | `TWITCH_REFRESH_TOKEN` | vide | Optionnel, token de secours si `data/token.json` est absent. |
 

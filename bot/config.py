@@ -42,6 +42,7 @@ class Config:
     poll_interval: int
     log_level: str
     discord_webhook: str | None
+    timezone: str = ""
     token_file: Path = field(default=TOKEN_FILE)
 
     @classmethod
@@ -81,4 +82,5 @@ class Config:
             poll_interval=max(15, _int("POLL_INTERVAL", 20)),
             log_level=(os.getenv("LOG_LEVEL") or "INFO").strip().upper(),
             discord_webhook=webhook,
+            timezone=(os.getenv("TZ") or "").strip(),
         )
