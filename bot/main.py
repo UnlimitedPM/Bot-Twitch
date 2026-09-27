@@ -53,8 +53,8 @@ class Bot:
         self._watcher = StreamWatcher(
             cfg.streamer_login,
             cfg.watch_quality,
-            token_provider=auth.ensure_valid,
             is_live=self._is_stream_live,
+            on_problem=self._alert,
         )
         self._chat = ChatClient(
             me_login, token_provider=auth.ensure_valid, channel=cfg.streamer_login
@@ -171,7 +171,7 @@ class Bot:
 
         try:
             await self._watcher.start()
-            log.info("streamlink lance, la vue est comptee.")
+            log.info("streamlink lance, en attente des premiers octets.")
         except (RuntimeError, OSError) as exc:
             log.error("Impossible de lancer streamlink : %s", exc)
             await self._alert(f"streamlink n'a pas demarre : {exc}")

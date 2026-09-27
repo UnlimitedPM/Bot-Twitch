@@ -116,9 +116,17 @@ en route apres un crash ou un reboot.
 - **Vitesse de connexion** : EventSub est une notification *push* : la connexion
   part dans la seconde qui suit le debut du live. Le sondage n'est qu'un secours.
 - **Comptage de la vue** : `streamlink --stdout` telecharge le flux en continu
-  (mute, sans lecture audio). Rien n'est enregistre sur le disque.
+  (mute, sans lecture audio). Rien n'est enregistre sur le disque. Le flux est pris
+  **en anonyme** : passer le token OAuth du compte ne marche pas, l'API interne de
+  Twitch le rejette (`Unauthorized: The Authorization token is invalid`) et
+  streamlink tourne alors a vide sans jamais sortir. Une vue anonyme compte
+  normalement pour Twitch.
 - **Si le flux se coupe** : relance automatique avec backoff, et relance forcee si
   aucun octet n'arrive pendant 2 minutes.
+- **Si rien ne passe** : les dernieres lignes de `streamlink` sont affichees en
+  WARNING, puis apres 3 lancements sans le moindre octet le bot alerte (Discord si
+  configure) et espace les relances a 5 minutes au lieu de boucler toutes les 2
+  minutes.
 - **Message d'accueil** : envoye une seule fois par live (1,5 s apres la detection,
   le temps que le chat soit pret).
 - **Token perime / revoque** : le bot s'arrete avec une erreur claire ; dans Docker
