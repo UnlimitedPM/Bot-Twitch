@@ -16,7 +16,11 @@ Bot qui surveille la chaine d'un streamer et, des que le live demarre :
 | `bot/chat.py` | Connexion IRC au chat pour envoyer le message d'accueil. |
 | `bot/auth.py` | Token OAuth utilisateur, rafraichi automatiquement (`data/token.json`). |
 
-Aucun compte bot necessaire : le bot utilise **ton** compte Twitch (c'est toi qui regardes et qui parles).
+Aucun compte bot necessaire : le bot utilise **ton** compte Twitch pour le chat
+(c'est toi qui parles : le message d'accueil part de ton compte et tu apparais
+dans la liste des chatters). Le visionnage, lui, est **anonyme** : ton token
+d'application ne peut pas servir a `streamlink` (voir *Details utiles*). La vue
+compte quand meme dans le compteur du streamer.
 
 ## Chrono de reaction
 
