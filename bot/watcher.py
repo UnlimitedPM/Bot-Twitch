@@ -14,14 +14,21 @@ automatiquement en anonyme pour ne pas perdre la vue.
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
+import tempfile
 import time
 from collections import deque
+from pathlib import Path
 from typing import Awaitable, Callable
 
 from .log import get_logger
 
 log = get_logger("watcher")
+
+# Fichier de config streamlink qui porte le token. En argument de commande, le
+# token apparaitrait en clair dans "ps" / "docker top".
+CONFIG_PATH = Path(tempfile.gettempdir()) / "streamlink-twitch.conf"
 
 # Si aucun octet ne descend pendant ce delai alors que le live est en cours,
 # on considere la connexion morte et on relance.
@@ -81,6 +88,7 @@ class StreamWatcher:
             except (asyncio.CancelledError, Exception):  # noqa: BLE001
                 pass
             self._task = None
+        self._remove_config()
 
     # ------------------------------------------------------------------ interne
 
@@ -141,6 +149,7 @@ class StreamWatcher:
                     # Le token est refuse (ou le flux bloque avant tout octet) :
                     # on prefere une vue anonyme a aucune vue du tout.
                     self._use_auth = False
+                    self._remove_config()
                     await self._problem(
                         "Aucun octet recu avec le token du compte : on repasse en "
                         "anonyme pour ne pas perdre la vue."
@@ -193,13 +202,26 @@ class StreamWatcher:
         cmd = ["streamlink", "--loglevel", "info"]
         if self._use_auth and self._token_provider is not None:
             token = await self._token_provider()
-            cmd += ["--twitch-api-header", f"Authorization=Bearer {token}"]
+            self._write_config(token)
+            cmd += ["--config", str(CONFIG_PATH)]
         cmd += [f"https://www.twitch.tv/{self._login}", self._quality, "--stdout"]
         return await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+
+    def _write_config(self, token: str) -> None:
+        """Ecrit la config streamlink avec le token (droits 600, nous seulement)."""
+        descriptor = os.open(CONFIG_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(f"twitch-api-header=Authorization=Bearer {token}\n")
+
+    def _remove_config(self) -> None:
+        try:
+            CONFIG_PATH.unlink(missing_ok=True)
+        except OSError as exc:  # noqa: BLE001
+            log.debug("Config streamlink non supprimee : %s", exc)
 
     async def _drain_stdout(self, proc: asyncio.subprocess.Process) -> None:
         """Consomme les octets du flux (c'est ca qui compte comme une vue)."""
