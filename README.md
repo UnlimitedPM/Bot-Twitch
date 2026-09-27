@@ -18,9 +18,9 @@ Bot qui surveille la chaine d'un streamer et, des que le live demarre :
 
 Aucun compte bot necessaire : le bot utilise **ton** compte Twitch pour le chat
 (c'est toi qui parles : le message d'accueil part de ton compte et tu apparais
-dans la liste des chatters). Le visionnage, lui, est **anonyme** : ton token
-d'application ne peut pas servir a `streamlink` (voir *Details utiles*). La vue
-compte quand meme dans le compteur du streamer.
+dans la liste des chatters) et pour la vue (ta session de visionnage est
+authentifiee avec ton token). Si le token est refuse, le bot repasse tout seul en
+anonyme pour ne pas perdre la vue, et le dit dans les logs.
 
 ## Chrono de reaction
 
@@ -120,11 +120,12 @@ en route apres un crash ou un reboot.
 - **Vitesse de connexion** : EventSub est une notification *push* : la connexion
   part dans la seconde qui suit le debut du live. Le sondage n'est qu'un secours.
 - **Comptage de la vue** : `streamlink --stdout` telecharge le flux en continu
-  (mute, sans lecture audio). Rien n'est enregistre sur le disque. Le flux est pris
-  **en anonyme** : passer le token OAuth du compte ne marche pas, l'API interne de
-  Twitch le rejette (`Unauthorized: The Authorization token is invalid`) et
-  streamlink tourne alors a vide sans jamais sortir. Une vue anonyme compte
-  normalement pour Twitch.
+  (mute, sans lecture audio). Rien n'est enregistre sur le disque. La session est
+  **authentifiee avec ton compte** via `--twitch-api-header
+  Authorization=Bearer <token>`. Attention au prefixe : en `OAuth`, Twitch repond
+  `Unauthorized: The Authorization token is invalid` et streamlink tourne a vide
+  (0 octet) sans jamais sortir — c'est ce qui arrivait avant. Si le token est
+  quand meme refuse, le bot repasse en anonyme (la vue compte toujours) et previent.
 - **Si le flux se coupe** : relance automatique avec backoff, et relance forcee si
   aucun octet n'arrive pendant 2 minutes.
 - **Si rien ne passe** : les dernieres lignes de `streamlink` sont affichees en

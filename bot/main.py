@@ -54,6 +54,7 @@ class Bot:
             cfg.streamer_login,
             cfg.watch_quality,
             is_live=self._is_stream_live,
+            token_provider=auth.ensure_valid,
             on_problem=self._alert,
         )
         self._chat = ChatClient(

@@ -4,11 +4,11 @@ Un spectateur est compte par Twitch quand une session consomme le flux.
 On lance donc streamlink (qualite configurable, "audio_only" par defaut, tres leger)
 et on le surveille : s'il meurt alors que le live continue, on le relance.
 
-Note : streamlink telecharge en anonyme. Lui passer le token OAuth du compte
-(``--twitch-api-header Authorization=OAuth ...``) ne fonctionne pas : l'API
-interne de Twitch rejette un token emis par une autre application que son propre
-client ("Unauthorized: The Authorization token is invalid"), et streamlink
-tourne alors a vide (0 octet) sans jamais sortir. Une vue anonyme compte autant.
+La vue est prise avec ton compte : on passe son access token a streamlink via
+``--twitch-api-header Authorization=Bearer <token>``. Attention au prefixe, en
+``OAuth`` l'API interne de Twitch repond "The Authorization token is invalid" et
+streamlink tourne alors a vide (0 octet). Si le token est refuse, on repasse
+automatiquement en anonyme pour ne pas perdre la vue.
 """
 
 from __future__ import annotations
@@ -39,11 +39,14 @@ class StreamWatcher:
         login: str,
         quality: str,
         is_live: Callable[[], Awaitable[bool]],
+        token_provider: Callable[[], Awaitable[str]] | None = None,
         on_problem: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._login = login
         self._quality = quality
         self._is_live = is_live
+        self._token_provider = token_provider
+        self._use_auth = token_provider is not None
         self._on_problem = on_problem
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -63,6 +66,9 @@ class StreamWatcher:
                 "streamlink introuvable. Installe-le : pip install streamlink"
             )
         self._stop.clear()
+        # Chaque live repart connecte au compte : on ne reste en anonyme que si le
+        # token a vraiment ete refuse pendant le live precedent.
+        self._use_auth = self._token_provider is not None
         self._task = asyncio.create_task(self._supervise())
 
     async def stop(self) -> None:
@@ -99,7 +105,12 @@ class StreamWatcher:
             stderr_task = asyncio.create_task(self._drain_stderr(proc, stderr_tail))
             monitor = asyncio.create_task(self._stall_monitor(proc))
 
-            log.info("Vue demarree sur %s (qualite %s).", self._login, self._quality)
+            log.info(
+                "Vue demarree sur %s (qualite %s, %s).",
+                self._login,
+                self._quality,
+                "connecte au compte" if self._use_auth else "anonyme",
+            )
             await proc.wait()
             self._proc = None
 
@@ -125,6 +136,14 @@ class StreamWatcher:
                 if stderr_tail:
                     log.warning(
                         "Dernieres lignes streamlink : %s", " | ".join(stderr_tail)
+                    )
+                if self._use_auth:
+                    # Le token est refuse (ou le flux bloque avant tout octet) :
+                    # on prefere une vue anonyme a aucune vue du tout.
+                    self._use_auth = False
+                    await self._problem(
+                        "Aucun octet recu avec le token du compte : on repasse en "
+                        "anonyme pour ne pas perdre la vue."
                     )
             else:
                 log.info(
@@ -167,18 +186,15 @@ class StreamWatcher:
             await self._sleep(delay)
 
     async def _spawn(self) -> asyncio.subprocess.Process:
-        # Pas de token OAuth ici : l'API interne de Twitch le rejette quand il
-        # vient d'une autre application (voir le docstring du module).
+        # Le prefixe doit etre "Bearer" : en "OAuth", Twitch repond
+        # "The Authorization token is invalid" et streamlink tourne a vide.
         # Pas de --retry-streams non plus : en cas d'erreur reelle streamlink doit
         # sortir vite (sinon il tourne a vide), c'est la supervision qui relance.
-        cmd = [
-            "streamlink",
-            "--loglevel",
-            "info",
-            f"https://www.twitch.tv/{self._login}",
-            self._quality,
-            "--stdout",
-        ]
+        cmd = ["streamlink", "--loglevel", "info"]
+        if self._use_auth and self._token_provider is not None:
+            token = await self._token_provider()
+            cmd += ["--twitch-api-header", f"Authorization=Bearer {token}"]
+        cmd += [f"https://www.twitch.tv/{self._login}", self._quality, "--stdout"]
         return await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
