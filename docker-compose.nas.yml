@@ -1,0 +1,24 @@
+# Variante NAS : utilise l'image publiee sur Docker Hub au lieu de construire
+# sur place (rien a installer sur le NAS : pas de Python, pas de pip).
+#
+# Sur le NAS, 2 choses a mettre a cote de ce fichier :
+#   - .env            : identifiants Twitch + TZ (+ TWITCH_REFRESH_TOKEN)
+#   - data/           : le token OAuth (a copier depuis le PC), si tu n'utilises
+#                       pas TWITCH_REFRESH_TOKEN dans le .env
+#
+# Puis, dans le dossier :
+#   docker compose -f docker-compose.nas.yml up -d
+#   docker compose -f docker-compose.nas.yml logs -f
+services:
+  bot:
+    image: tungstene074/bot-twitch:latest
+    container_name: bot-twitch
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Fuseau des horodatages de logs : sans ca le NAS log en UTC.
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # Le token OAuth est persiste ici pour survivre aux redemarrages.
+      - ./data:/app/data

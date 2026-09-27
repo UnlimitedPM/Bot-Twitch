@@ -99,6 +99,32 @@ en route apres un crash ou un reboot.
 > conteneur : lance `python get_token.py` en local, puis copie le dossier `data/`
 > a cote du `docker-compose.yml`.
 
+## Image publiee (Docker Hub) et NAS
+
+L'image est publiee sur Docker Hub : **`tungstene074/bot-twitch:latest`**
+(`linux/amd64`). Pratique pour un NAS : rien a installer, rien a compiler.
+
+```bash
+# Sur le NAS, dans un dossier contenant .env et ce fichier :
+docker compose -f docker-compose.nas.yml up -d
+docker compose -f docker-compose.nas.yml logs -f
+```
+
+Sur le NAS, il faut donc :
+
+1. `.env` avec `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `STREAMER_LOGIN`, `TZ`;
+2. le token : soit `TWITCH_REFRESH_TOKEN` dans le `.env` (le plus simple, la
+   valeur est affichee par `python get_token.py`), soit le dossier `data/` copie
+   depuis le PC (il contient `token.json`).
+
+Pour republier l'image apres une modification du code :
+
+```bash
+docker login -u tungstene074          # une seule fois (un PAT est recommande)
+docker build -t tungstene074/bot-twitch:latest .
+docker push tungstene074/bot-twitch:latest
+```
+
 ## Configuration (`.env`)
 
 | Variable | Defaut | Description |
