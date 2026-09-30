@@ -1,0 +1,114 @@
+# Pipeline de release.
+#
+# Ce qu'il fait : construit l'image Docker, la publie sur GHCR (ghcr.io) et
+# attache l'image (archive .tar.gz) a une GitHub Release.
+#
+# Comment s'en servir :
+#   - automatique : pousser un tag de version, par exemple
+#         git tag 0.1.0
+#         git push origin 0.1.0
+#     -> le tag sert de version pour l'image ET pour la Release.
+#   - manuel : onglet "Actions" -> "Release" -> "Run workflow", le tag vaut
+#     "0.1.0" par defaut.
+#
+# Recuperer l'image attachee a une Release :
+#   docker load < bot-twitch-0.1.0.tar.gz
+# ou directement depuis GHCR :
+#   docker pull ghcr.io/unlimitedpm/bot-twitch:0.1.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      # Tags de version : 0.1.0, 1.2.3, v0.1.0, v1.2.3 ...
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag / version de la release (ex : 0.1.0)"
+        required: true
+        default: "0.1.0"
+        type: string
+
+# contents: ecrire la Release ; packages: publier sur GHCR.
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE_NAME: bot-twitch
+
+jobs:
+  release:
+    name: Build image -> GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Determine le tag et la version.
+      # - push d'un tag : on prend le nom du tag.
+      # - lancement manuel : on prend l'input, "0.1.0" par defaut.
+      - name: Calcul du tag et de la version
+        id: vars
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          [ -n "$TAG" ] || TAG="0.1.0"
+          # GHCR veut un chemin en minuscules (unlimitedpm).
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+          echo "Tag=$TAG  Version=${TAG#v}  Owner=$OWNER"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build de l'image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.version }}
+            ghcr.io/${{ steps.vars.outputs.owner }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Push de l'image sur GHCR
+        run: |
+          set -euo pipefail
+          docker push "ghcr.io/${{ steps.vars.outputs.owner }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.version }}"
+          docker push "ghcr.io/${{ steps.vars.outputs.owner }}/${{ env.IMAGE_NAME }}:latest"
+
+      # On exporte l'image en archive pour pouvoir la joindre a la Release.
+      - name: Export de l'image en .tar.gz
+        run: |
+          set -euo pipefail
+          ASSET="${{ env.IMAGE_NAME }}-${{ steps.vars.outputs.version }}.tar.gz"
+          docker save "ghcr.io/${{ steps.vars.outputs.owner }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.version }}" | gzip -9 > "$ASSET"
+          ls -lh "$ASSET"
+
+      - name: GitHub Release + image
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ env.IMAGE_NAME }}-${{ steps.vars.outputs.version }}.tar.gz
